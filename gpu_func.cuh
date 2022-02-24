@@ -9,7 +9,7 @@
 using namespace std;
 
 __device__ void softmax(float *src, int channels);
-__global__ void gpu_segmentation(float* pre, int channels, int height, int width);
+__global__ void gpu_segmentation(float* ptr, int channels, int height, int width);
 
 void segmentation(float* src_ptr, int channels, int height, int width, float* cpu_dst);
 
