@@ -1,4 +1,4 @@
-#ifndef  MAT_TRANSFORM_H_
+#ifndef MAT_TRANSFORM_H_
 #define MAT_TRANSFORM_H_
 
 #include <iostream>

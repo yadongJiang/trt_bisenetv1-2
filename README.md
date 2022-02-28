@@ -15,6 +15,11 @@
 ```
 # onnx->tensorrt所需要的主要参数
 $ OnnxInitParam params;
+$ params.onnx_model_path = "./BiSeNet/checkpoints/onnx/bisenet.onnx";
+$ params.rt_model_name = "bisenet.engine"
+$ params.use_fp16 = true;
+$ params.gpu_id = 0;
+$ params.num_classes = 4;
 
 # 实例化BiSeNet类，其中会进行模型转化和一些初始化的操作
 $ BiSeNet model(params);
