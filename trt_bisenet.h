@@ -5,7 +5,7 @@ struct OnnxInitParam
 {
 	std::string onnx_model_path;
 	std::string rt_stream_path = "./";
-	std::string rt_model_name = "bisenetv3.engine";
+	std::string rt_model_name = "bisenet.engine";
 	bool use_fp16 = false;
 	int gpu_id = 0;
 	int num_classes;
@@ -63,11 +63,11 @@ public:
 	}
 };
 
-class BiSeNetV3
+class BiSeNet
 {
 public:
-	BiSeNetV3(const OnnxInitParam& params);
-	~BiSeNetV3();
+	BiSeNet(const OnnxInitParam& params);
+	~BiSeNet();
 	void Initial();
 
 	void LoadOnnxModel();

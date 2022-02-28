@@ -10,10 +10,8 @@
 #include "trt_bisenet.h"
 #include "gpu_func.cuh"
 
-//class BiSeNetV3
-//{
-//public:
-BiSeNetV3::BiSeNetV3(const OnnxInitParam& params)
+
+BiSeNet::BiSeNet(const OnnxInitParam& params)
 {
 	cudaSetDevice(params.gpu_id);
 	_params = params;
@@ -23,7 +21,7 @@ BiSeNetV3::BiSeNetV3(const OnnxInitParam& params)
 	Initial();
 }
 
-BiSeNetV3::~BiSeNetV3()
+BiSeNet::~BiSeNet()
 {
 	cudaStreamSynchronize(stream_);
 	if (h_input_tensor_ != nullptr)
@@ -34,7 +32,7 @@ BiSeNetV3::~BiSeNetV3()
 		cudaFree(output_tensor_);
 }
 
-void BiSeNetV3::Initial()
+void BiSeNet::Initial()
 {
 	if (CheckFileExist(_params.rt_stream_path + _params.rt_model_name))
 	{
@@ -47,7 +45,7 @@ void BiSeNetV3::Initial()
 	}
 }
 
-void BiSeNetV3::LoadOnnxModel() 
+void BiSeNet::LoadOnnxModel() 
 {
 	if (!CheckFileExist(_params.onnx_model_path))
 	{
@@ -102,7 +100,7 @@ void BiSeNetV3::LoadOnnxModel()
 	deserializeCudaEngine(gie_model_stream->data(), gie_model_stream->size());
 }
 
-void BiSeNetV3::LoadGieStreamBuildContext(const std::string& gie_file)
+void BiSeNet::LoadGieStreamBuildContext(const std::string& gie_file)
 {
 	std::ifstream fgie(gie_file, std::ios_base::in | std::ios_base::binary);
 	if (!fgie)
@@ -119,7 +117,7 @@ void BiSeNetV3::LoadGieStreamBuildContext(const std::string& gie_file)
 	deserializeCudaEngine(stream_model.data(), stream_model.size());
 }
 
-void BiSeNetV3::mallocInputOutput(const std::vector<int> &input_shape, const std::vector<int> &output_shape)
+void BiSeNet::mallocInputOutput(const std::vector<int> &input_shape, const std::vector<int> &output_shape)
 {
 	if (!buffer_queue_.empty())
 	{
@@ -146,7 +144,7 @@ void BiSeNetV3::mallocInputOutput(const std::vector<int> &input_shape, const std
 	cudaMalloc((void**)&output_tensor_, count * sizeof(float));
 }
 
-cv::Mat BiSeNetV3::Extract(const cv::Mat& img)
+cv::Mat BiSeNet::Extract(const cv::Mat& img)
 {
 	if (img.empty())
 		return img;
@@ -160,14 +158,14 @@ cv::Mat BiSeNetV3::Extract(const cv::Mat& img)
 }
 
 //private:
-void BiSeNetV3::SaveRTModel(nvinfer1::IHostMemory* gie_model_stream, const std::string& path)
+void BiSeNet::SaveRTModel(nvinfer1::IHostMemory* gie_model_stream, const std::string& path)
 {
 	std::ofstream outfile(path, std::ios_base::out | std::ios_base::binary);
 	outfile.write((const char*)gie_model_stream->data(), gie_model_stream->size());
 	outfile.close();
 }
 
-void BiSeNetV3::deserializeCudaEngine(const void* blob_data, std::size_t size)
+void BiSeNet::deserializeCudaEngine(const void* blob_data, std::size_t size)
 {
 	_runtime = nvinfer1::createInferRuntime(logger);
 	assert(_runtime != nullptr);
@@ -178,7 +176,7 @@ void BiSeNetV3::deserializeCudaEngine(const void* blob_data, std::size_t size)
 	assert(_context != nullptr);
 }
 
-void BiSeNetV3::PreProcessCpu(const cv::Mat& img)
+void BiSeNet::PreProcessCpu(const cv::Mat& img)
 {
 	cv::Mat img_tmp = img;
 
@@ -198,7 +196,7 @@ void BiSeNetV3::PreProcessCpu(const cv::Mat& img)
 	cv::split(sample_float, channels);
 }
 
-void BiSeNetV3::Forward()
+void BiSeNet::Forward()
 {
 	cudaMemcpy(input_tensor_, h_input_tensor_, 
 		input_shape_[1] * input_shape_[2] * input_shape_[3] * sizeof(float), 
@@ -213,7 +211,7 @@ void BiSeNetV3::Forward()
 	cudaStreamSynchronize(stream_);
 }
 
-cv::Mat BiSeNetV3::PostProcessCpu()
+cv::Mat BiSeNet::PostProcessCpu()
 {
 	int num = output_shape_[0];
 	int channels = output_shape_[1];
@@ -250,7 +248,7 @@ cv::Mat BiSeNetV3::PostProcessCpu()
 	return std::move(res);
 }
 
-cv::Mat BiSeNetV3::PostProcessGpu()
+cv::Mat BiSeNet::PostProcessGpu()
 {
 	int num = output_shape_[0];
 	int channels = output_shape_[1];
@@ -287,7 +285,7 @@ cv::Mat BiSeNetV3::PostProcessGpu()
 	return std::move(res);
 }
 
-void BiSeNetV3::softmax(vector<float>& vec)
+void BiSeNet::softmax(vector<float>& vec)
 {
 	float tol = 0.0;
 	for (int i = 0; i < vec.size(); i++)
@@ -303,19 +301,17 @@ void BiSeNetV3::softmax(vector<float>& vec)
 int main(int argc, char** argv)
 {
 	OnnxInitParam params;
-	params.onnx_model_path = "E:/BaiduNetdiskDownload/BiSeNetv3/checkpoints/onnx/bisenetv3.onnx";
+	params.onnx_model_path = "./BiSeNet/checkpoints/onnx/bisenet.onnx";
 	params.use_fp16 = true;
 	params.gpu_id = 0;
 	params.num_classes = 4;
 
-	BiSeNetV3 model(params);
+	BiSeNet model(params);
 
-	cv::Mat img = cv::imread("E:/BaiduNetdiskDownload/BiSeNetv3/datas/tupian.jpg");
+	cv::Mat img = cv::imread("./BiSeNet/datas/tupian.jpg");
 
 	cv::Mat res = model.Extract(img);
 	cv::imshow("res", res);
 
-	res = model.Extract(img);
-	cv::imshow("res1", res);
 	cv::waitKey();
 }
