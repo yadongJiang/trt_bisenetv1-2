@@ -10,6 +10,17 @@
 #include "trt_bisenet.h"
 #include "gpu_func.cuh"
 
+//class BiSeNetV3
+//{
+//public:
+
+/*BiSeNet::BiSeNet()
+{
+	cudaSetDevice(0);
+	_params = OnnxInitParam();
+	cudaStreamCreate(&stream_);
+	Initial();
+}*/
 
 BiSeNet::BiSeNet(const OnnxInitParam& params)
 {
@@ -24,12 +35,23 @@ BiSeNet::BiSeNet(const OnnxInitParam& params)
 BiSeNet::~BiSeNet()
 {
 	cudaStreamSynchronize(stream_);
+	if(stream_)
+		cudaStreamDestroy(stream_);
+	if (_context != nullptr)
+		_context->destroy();
+	if (_engine != nullptr)
+		_engine->destroy();
+	if (_runtime != nullptr)
+		_runtime->destroy();
 	if (h_input_tensor_ != nullptr)
-		free(h_input_tensor_);
-	if (input_tensor_ != nullptr)
-		cudaFree(input_tensor_);
-	if (output_tensor_ != nullptr)
-		cudaFree(output_tensor_);
+		/*free(h_input_tensor_);*/
+		cudaFreeHost(h_input_tensor_);
+	if (d_input_tensor_ != nullptr)
+		cudaFree(d_input_tensor_);
+	if (d_output_tensor_ != nullptr)
+		cudaFree(d_output_tensor_);
+
+	buffer_queue_.clear();
 }
 
 void BiSeNet::Initial()
@@ -45,7 +67,7 @@ void BiSeNet::Initial()
 	}
 }
 
-void BiSeNet::LoadOnnxModel() 
+void BiSeNet::LoadOnnxModel()
 {
 	if (!CheckFileExist(_params.onnx_model_path))
 	{
@@ -65,7 +87,6 @@ void BiSeNet::LoadOnnxModel()
 	nvinfer1::IBuilderConfig* build_config = builder->createBuilderConfig();
 	nvinfer1::IOptimizationProfile* profile = builder->createOptimizationProfile();
 	nvinfer1::ITensor* input = network->getInput(0);
-	std::cout << "input name: " << input->getName() << std::endl;
 	nvinfer1::Dims input_dims = input->getDimensions();
 	std::cout << "batch_size: " << input_dims.d[0]
 		<< " channels: " << input_dims.d[1]
@@ -98,6 +119,12 @@ void BiSeNet::LoadOnnxModel()
 	SaveRTModel(gie_model_stream, _params.rt_stream_path + _params.rt_model_name);
 
 	deserializeCudaEngine(gie_model_stream->data(), gie_model_stream->size());
+
+	builder->destroy();
+	network->destroy();
+	parser->destroy();
+	build_config->destroy();
+	engine->destroy();
 }
 
 void BiSeNet::LoadGieStreamBuildContext(const std::string& gie_file)
@@ -121,6 +148,7 @@ void BiSeNet::mallocInputOutput(const std::vector<int> &input_shape, const std::
 {
 	if (!buffer_queue_.empty())
 	{
+		cout << "--------------------" << endl;
 		for (int i = 0; i < buffer_queue_.size(); i++)
 		{
 			cudaFree(buffer_queue_[i]);
@@ -135,13 +163,14 @@ void BiSeNet::mallocInputOutput(const std::vector<int> &input_shape, const std::
 	int count = 1;
 	for (int i = 0; i < input_shape.size(); i++)
 		count *= input_shape[i];
-	h_input_tensor_ = (float*)malloc(count * sizeof(float));
-	cudaMalloc((void**)&input_tensor_, count * sizeof(float));
+	/*h_input_tensor_ = (float*)malloc(count * sizeof(float));*/
+	cudaHostAlloc((void**)&h_input_tensor_, count * sizeof(float), cudaHostAllocDefault);
+	cudaMalloc((void**)&d_input_tensor_, count * sizeof(float));
 
 	count = 1;
 	for (int i = 0; i < output_shape.size(); i++)
 		count *= output_shape[i];
-	cudaMalloc((void**)&output_tensor_, count * sizeof(float));
+	cudaMalloc((void**)&d_output_tensor_, count * sizeof(float));
 }
 
 cv::Mat BiSeNet::Extract(const cv::Mat& img)
@@ -152,7 +181,7 @@ cv::Mat BiSeNet::Extract(const cv::Mat& img)
 	PreProcessCpu(img);
 	Forward();
 
-	//cv::Mat res = PostProcessCpu();
+	/*cv::Mat res = PostProcessCpu();*/
 	cv::Mat res = PostProcessGpu();
 	return std::move(res);
 }
@@ -198,12 +227,12 @@ void BiSeNet::PreProcessCpu(const cv::Mat& img)
 
 void BiSeNet::Forward()
 {
-	cudaMemcpy(input_tensor_, h_input_tensor_, 
+	cudaMemcpy(d_input_tensor_, h_input_tensor_,
 		input_shape_[1] * input_shape_[2] * input_shape_[3] * sizeof(float), 
 		cudaMemcpyHostToDevice);
 
-	buffer_queue_.push_back(input_tensor_);
-	buffer_queue_.push_back(output_tensor_);
+	buffer_queue_.push_back(d_input_tensor_);
+	buffer_queue_.push_back(d_output_tensor_);
 	nvinfer1::Dims4 input_dims{ 1, input_shape_[1], input_shape_[2], input_shape_[3] };
 	_context->setBindingDimensions(0, input_dims);
 	_context->enqueueV2(buffer_queue_.data(), stream_, nullptr);
@@ -218,8 +247,10 @@ cv::Mat BiSeNet::PostProcessCpu()
 	int height = output_shape_[2];
 	int width = output_shape_[3];
 
-	float* h_output_tensor = (float*)malloc(num * channels * height * width * sizeof(float));
-	cudaMemcpy(h_output_tensor, output_tensor_, 
+	/*float* h_output_tensor = (float*)malloc(num * channels * height * width * sizeof(float));*/
+	float* h_output_tensor;
+	cudaHostAlloc((void**)&h_output_tensor, num * channels * height * width * sizeof(float), cudaHostAllocDefault);
+	cudaMemcpy(h_output_tensor, d_output_tensor_,
 		num * channels * height * width * sizeof(float), cudaMemcpyDeviceToHost);
 
 	cv::Mat res = cv::Mat::zeros(height, width, CV_8UC1);
@@ -234,16 +265,22 @@ cv::Mat BiSeNet::PostProcessCpu()
 				float val = h_output_tensor[index];
 				vec.push_back(val);
 			}
-			softmax(vec);
-
+			
+			/*softmax(vec);
 			if (vec[2] > 0.5)
 				res.at<uchar>(row, col) = uchar(255);
 			else
-				res.at<uchar>(row, col) = uchar(0);
+				res.at<uchar>(row, col) = uchar(0);*/
+
+			int idx = findMaxIdx(vec);
+			if (idx == -1)
+				continue;
+			res.at<uchar>(row, col) = uchar(idx);
 		}
 	}
 
-	free(h_output_tensor);
+	/*free(h_output_tensor);*/
+	cudaFreeHost(h_output_tensor);
 
 	return std::move(res);
 }
@@ -255,14 +292,17 @@ cv::Mat BiSeNet::PostProcessGpu()
 	int height = output_shape_[2];
 	int width = output_shape_[3];
 
-	/*float* gpu_ptr = output.mutable_gpu_data();*/
-	/*float *src_ptr = output.mutable_cpu_data();*/
-	float* cpu_dst = (float*)malloc(channels * height * width * sizeof(float));
-	cout << "start..." << endl;
-	segmentation(output_tensor_, channels, height, width, cpu_dst);
-	cout << "end ..." << endl;
+	/*float* cpu_dst = (float*)malloc(channels * height * width * sizeof(float));*/
+	/*float* cpu_dst;
+	cudaHostAlloc((void**)&cpu_dst, channels * height * width * sizeof(float), cudaHostAllocDefault);*/
+	unsigned char* cpu_dst;
+	cudaHostAlloc((void**)&cpu_dst, height * width * sizeof(float), cudaHostAllocDefault);  // channels * 
+	//==> segmentation(output_tensor_, channels, height, width, cpu_dst);
+	segmentation(d_output_tensor_, channels, height, width, cpu_dst);
 
-	cv::Mat res = cv::Mat::zeros(height, width, CV_8UC1);
+	cv::Mat res = cv::Mat(height, width, CV_8UC1, cpu_dst);
+
+	/*==>>>cv::Mat res = cv::Mat::zeros(height, width, CV_8UC1);
 	for (int row = 0; row < height; row++)
 	{
 		for (int col = 0; col < width; col++)
@@ -280,7 +320,11 @@ cv::Mat BiSeNet::PostProcessGpu()
 			else
 				res.at<uchar>(row, col) = uchar(0);
 		}
-	}
+	}*/
+	/*free(cpu_dst);*/
+
+	
+	cudaFreeHost(cpu_dst);
 
 	return std::move(res);
 }
@@ -298,18 +342,25 @@ void BiSeNet::softmax(vector<float>& vec)
 		vec[i] = vec[i] / tol;
 }
 
+int BiSeNet::findMaxIdx(const vector<float>& vec)
+{
+	if (vec.empty())
+		return -1;
+	auto pos = max_element(vec.begin(), vec.end());
+	return std::distance(vec.begin(), pos);
+}
+
 int main(int argc, char** argv)
 {
 	OnnxInitParam params;
-	params.onnx_model_path = "./BiSeNet/checkpoints/onnx/bisenet.onnx";
-	params.rt_model_name = "bisenet.engine"
+	params.onnx_model_path = "./checkpoints/onnx/bisenet.onnx";
 	params.use_fp16 = true;
 	params.gpu_id = 0;
 	params.num_classes = 4;
 
 	BiSeNet model(params);
 
-	cv::Mat img = cv::imread("./BiSeNet/datas/tupian.jpg");
+	cv::Mat img = cv::imread("./datas/tupian.jpg");
 
 	cv::Mat res = model.Extract(img);
 	cv::imshow("res", res);

@@ -66,8 +66,9 @@ public:
 class BiSeNet
 {
 public:
+	BiSeNet() = delete;
 	BiSeNet(const OnnxInitParam& params);
-	~BiSeNet();
+	virtual ~BiSeNet();
 	void Initial();
 
 	void LoadOnnxModel();
@@ -88,7 +89,8 @@ private:
 	cv::Mat PostProcessCpu();
 	cv::Mat PostProcessGpu();
 
-	void softmax(vector<float>& vec);
+	static void softmax(vector<float>& vec);
+	static int findMaxIdx(const vector<float>& vec);
 
 
 private:
@@ -103,9 +105,9 @@ private:
 	std::vector<void*> buffer_queue_;
 
 	float* h_input_tensor_;
-	float* input_tensor_;
+	float* d_input_tensor_;
 	std::vector<int> input_shape_;
-	float* output_tensor_;
+	float* d_output_tensor_;
 	std::vector<int> output_shape_;
 
 	std::vector<float> mean_{ 0.485, 0.456, 0.406 };
