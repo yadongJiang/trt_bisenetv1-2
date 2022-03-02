@@ -2,6 +2,12 @@
 
 使用TensorRT c++实现 [BiSeNetV1](https://arxiv.org/abs/1808.00897) 和 [BiSeNetV2](https://arxiv.org/abs/1808.00897)部署
 
+## 环境依赖
+
+1. Opencv3.1
+2. TensorRT7.2
+3. Cuda10.2
+
 ## 代码介绍
 
 1. trt_bisenet.h与trt_bisenet.cpp为主要实现代码，主要包括onnx->tensorrt生成.engine模型、预处理、前向传播、后处理等步骤
