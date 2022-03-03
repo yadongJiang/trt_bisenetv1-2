@@ -132,10 +132,11 @@ void BiSeNet::LoadGieStreamBuildContext(const std::string& gie_file)
 	deserializeCudaEngine(stream_model.data(), stream_model.size());
 }
 
-void BiSeNet::mallocInputOutput(const std::vector<int> &input_shape, const std::vector<int> &output_shape)
+void BiSeNet::mallocInputOutput(const Shape& input_shape, const Shape& output_shape) 
 {
 	if (!buffer_queue_.empty())
 	{
+		cout << "--------------------" << endl;
 		for (int i = 0; i < buffer_queue_.size(); i++)
 		{
 			cudaFree(buffer_queue_[i]);
@@ -144,19 +145,15 @@ void BiSeNet::mallocInputOutput(const std::vector<int> &input_shape, const std::
 		buffer_queue_.clear();
 	}
 		
-	input_shape_ = input_shape;
-	output_shape_ = output_shape;
+	input_shape_t = input_shape;
+	output_shape_t = output_shape;
 
-	int count = 1;
-	for (int i = 0; i < input_shape.size(); i++)
-		count *= input_shape[i];
-	
+	int count = input_shape_t.count();
+	/*h_input_tensor_ = (float*)malloc(count * sizeof(float));*/
 	cudaHostAlloc((void**)&h_input_tensor_, count * sizeof(float), cudaHostAllocDefault);
 	cudaMalloc((void**)&d_input_tensor_, count * sizeof(float));
 
-	count = 1;
-	for (int i = 0; i < output_shape.size(); i++)
-		count *= output_shape[i];
+	count = output_shape_t.count();
 	cudaMalloc((void**)&d_output_tensor_, count * sizeof(float));
 }
 
@@ -173,6 +170,7 @@ cv::Mat BiSeNet::Extract(const cv::Mat& img)
 	return std::move(res);
 }
 
+//private:
 void BiSeNet::SaveRTModel(nvinfer1::IHostMemory* gie_model_stream, const std::string& path)
 {
 	std::ofstream outfile(path, std::ios_base::out | std::ios_base::binary);
@@ -202,24 +200,24 @@ void BiSeNet::PreProcessCpu(const cv::Mat& img)
 	});
 
 	cv::Mat sample_float = compose(img_tmp);
-	vector<int> input_shape{ 1, sample_float.channels(), sample_float.rows, sample_float.cols };
-	vector<int> output_shape{ 1, _params.num_classes, sample_float.rows, sample_float.cols };
+	Shape input_shape(1, sample_float.channels(), sample_float.rows, sample_float.cols);
+	Shape output_shape(1, _params.num_classes, sample_float.rows, sample_float.cols);
 	mallocInputOutput(input_shape, output_shape);
 
 	Tensor2VecMat tensor_2_mat;
-	std::vector<cv::Mat> channels = tensor_2_mat(h_input_tensor_, input_shape_);
+	std::vector<cv::Mat> channels = tensor_2_mat(h_input_tensor_, input_shape_t); 
 	cv::split(sample_float, channels);
 }
 
 void BiSeNet::Forward()
 {
 	cudaMemcpy(d_input_tensor_, h_input_tensor_,
-		input_shape_[1] * input_shape_[2] * input_shape_[3] * sizeof(float), 
-		cudaMemcpyHostToDevice);
+		input_shape_t.count() * sizeof(float),
+		cudaMemcpyHostToDevice); 
 
 	buffer_queue_.push_back(d_input_tensor_);
 	buffer_queue_.push_back(d_output_tensor_);
-	nvinfer1::Dims4 input_dims{ 1, input_shape_[1], input_shape_[2], input_shape_[3] };
+	nvinfer1::Dims4 input_dims{ 1, input_shape_t.channels(), input_shape_t.height(), input_shape_t.width() }; 
 	_context->setBindingDimensions(0, input_dims);
 	_context->enqueueV2(buffer_queue_.data(), stream_, nullptr);
 
@@ -228,15 +226,16 @@ void BiSeNet::Forward()
 
 cv::Mat BiSeNet::PostProcessCpu()
 {
-	int num = output_shape_[0];
-	int channels = output_shape_[1];
-	int height = output_shape_[2];
-	int width = output_shape_[3];
+	int num = output_shape_t.num();
+	int channels = output_shape_t.channels();
+	int height = output_shape_t.height();
+	int width = output_shape_t.width();
+	int count = output_shape_t.count();
 
 	float* h_output_tensor;
-	cudaHostAlloc((void**)&h_output_tensor, num * channels * height * width * sizeof(float), cudaHostAllocDefault);
+	cudaHostAlloc((void**)&h_output_tensor, count * sizeof(float), cudaHostAllocDefault);  
 	cudaMemcpy(h_output_tensor, d_output_tensor_,
-		num * channels * height * width * sizeof(float), cudaMemcpyDeviceToHost);
+		count * sizeof(float), cudaMemcpyDeviceToHost); 
 
 	cv::Mat res = cv::Mat::zeros(height, width, CV_8UC1);
 	for (int row = 0; row < height; row++)
@@ -258,6 +257,7 @@ cv::Mat BiSeNet::PostProcessCpu()
 		}
 	}
 
+	/*free(h_output_tensor);*/
 	cudaFreeHost(h_output_tensor);
 
 	return std::move(res);
@@ -265,13 +265,14 @@ cv::Mat BiSeNet::PostProcessCpu()
 
 cv::Mat BiSeNet::PostProcessGpu()
 {
-	int num = output_shape_[0];
-	int channels = output_shape_[1];
-	int height = output_shape_[2];
-	int width = output_shape_[3];
+	int num = output_shape_t.num();
+	int channels = output_shape_t.channels();
+	int height = output_shape_t.height();
+	int width = output_shape_t.width();
 
 	unsigned char* cpu_dst;
 	cudaHostAlloc((void**)&cpu_dst, height * width * sizeof(float), cudaHostAllocDefault); 
+	//==> segmentation(output_tensor_, channels, height, width, cpu_dst);
 	segmentation(d_output_tensor_, channels, height, width, cpu_dst);
 
 	cv::Mat res = cv::Mat(height, width, CV_8UC1, cpu_dst);
@@ -312,7 +313,7 @@ int main(int argc, char** argv)
 
 	BiSeNet model(params);
 
-	cv::Mat img = cv::imread("./datas/tupian.jpg");
+	cv::Mat img = cv::imread("./BiSeNetv3/datas/tupian.jpg");
 
 	cv::Mat res = model.Extract(img);
 	cv::imshow("res", res);
