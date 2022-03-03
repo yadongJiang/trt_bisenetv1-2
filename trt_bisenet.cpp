@@ -1,11 +1,3 @@
-#include <iostream>
-#include <opencv2/opencv.hpp>
-#include "NvOnnxParser.h"
-#include "NvInfer.h"
-#include <cuda_runtime_api.h>
-#include <vector>
-#include <string>
-#include <fstream>
 #include "mat_transform.hpp"
 #include "trt_bisenet.h"
 #include "gpu_func.cuh"
