@@ -16,7 +16,7 @@
 
 ## 使用方法
 
-具体使用方法可以参照trt_bisenet.cpp中的main()函数。如果初次调用，需要指定onnx模型的地址、生成的.engine模型的保存路径以及保存的模型名。
+具体使用方法可以参照trt_bisenet.cpp中的main()函数。如果初次调用，需要指定onnx模型的路径、生成的trt模型的保存路径以及保存的模型名。
 初次调用之后会生成.engine的trt模型，并保存到指定位置，之后再调用，则直接调用.engine模型。
 ```
 # onnx->tensorrt所需要的主要参数
@@ -24,7 +24,7 @@
 # onnx模型路径
   params.onnx_model_path = "./BiSeNet/checkpoints/onnx/bisenet.onnx";
 # 保存生成.engine的模型路径
-  params.rt_stream_path
+  params.rt_stream_path = "./"
   params.rt_model_name = "bisenet.engine"
 # 是否使用半精度，如果false，则使用fp32精度的
   params.use_fp16 = true;
