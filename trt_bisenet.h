@@ -66,8 +66,7 @@ private:
 		}
 	};
 
-private:
-	// void mallocInputOutput(const Shape &input_shape, const Shape &output_shape); 
+private: 
 	void mallocInputOutput();
 	void SaveRTModel(nvinfer1::IHostMemory* gie_model_stream, const std::string& path);
 

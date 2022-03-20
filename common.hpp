@@ -57,7 +57,7 @@ class Tensor2VecMat
 {
 public:
 	Tensor2VecMat() {}
-	vector<cv::Mat> operator()(float* h_src, const Shape& input_shape)  // const std::vector<int>& input_shape
+	vector<cv::Mat> operator()(float* h_src, const Shape& input_shape)  
 	{
 		vector<cv::Mat> input_channels;
 		int channels = input_shape.channels();

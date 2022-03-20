@@ -7,7 +7,7 @@ int main(int argc, char** argv)
 	params.use_fp16 = true;
 	params.gpu_id = 0;
 	params.num_classes = 4;
-	params.max_shape = Shape(1, 3, 640, 640); // 设置最大网络输入大小，用于分配内存(显存)
+	params.max_shape = Shape(1, 3, 640, 640); // 设置最大网络输入大小，用于分配内存(显存)，根据自己项目需要设置
 
 	BiSeNet model(params);
 

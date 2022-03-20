@@ -110,7 +110,7 @@ public:
 		cv::Mat resize_mat;
 		if (img.rows != new_unpad.height || img.cols != new_unpad.width)
 			cv::resize(img, resize_mat, new_unpad, 0, 0, cv::INTER_LINEAR);
-		int top = 0; // int(round(dh - 0.1));
+		int top = 0; //  int(round(dh - 0.1));
 		int bottom = int(dh); // int(round(dh + 0.1));
 		int left = 0; // int(round(dw - 0.1));
 		int right = int(dw); // int(round(dw + 0.1));

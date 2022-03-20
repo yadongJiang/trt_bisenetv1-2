@@ -214,7 +214,7 @@ cv::Mat BiSeNet::PostProcessCpu()
 	int count = output_shape_t.count();
 
 	cudaMemcpy(h_output_tensor_, d_output_tensor_,
-		count * sizeof(float), cudaMemcpyDeviceToHost); // num * channels * height * width
+		count * sizeof(float), cudaMemcpyDeviceToHost); //  num * channels * height * width
 
 	cv::Mat res = cv::Mat::zeros(height, width, CV_8UC1);
 	for (int row = 0; row < height; row++)
