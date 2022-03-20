@@ -9,106 +9,19 @@
 #include <vector>
 #include <string>
 #include <fstream>
+#include "common.hpp"
+
+using namespace std;
 
 struct OnnxInitParam
 {
 	std::string onnx_model_path;
 	std::string rt_stream_path = "./";
-	std::string rt_model_name = "bisenet.engine";
+	std::string rt_model_name = "bisenetv3.engine";
 	bool use_fp16 = false;
 	int gpu_id = 0;
 	int num_classes;
-};
-
-bool CheckFileExist(const std::string& path)
-{
-	std::ifstream check_file(path);
-	return check_file.is_open();
-}
-
-class Shape
-{
-public:
-	Shape() :num_(0), channels_(0), height_(0), width_(0) {}
-	Shape(int num, int channels, int height, int width) :
-		num_(num), channels_(channels), height_(height), width_(width) {}
-	~Shape() {}
-
-public:
-	inline int num() const
-	{
-		return num_;
-	}
-	inline int channels() const
-	{
-		return channels_;
-	}
-	inline int height() const
-	{
-		return height_;
-	}
-	inline int width() const
-	{
-		return width_;
-	}
-	inline int count() const
-	{
-		return num_ * channels_ * height_ * width_;
-	}
-private:
-	int num_;
-	int channels_;
-	int height_;
-	int width_;
-};
-
-class Tensor2VecMat
-{
-public:
-	Tensor2VecMat() {}
-	vector<cv::Mat> operator()(float* h_src, const Shape& input_shape)  // const std::vector<int>& input_shape
-	{
-		vector<cv::Mat> input_channels;
-		int channels = input_shape.channels();
-		int height = input_shape.height();
-		int width = input_shape.width();
-
-		for (int i = 0; i < channels; i++)
-		{
-			cv::Mat channel(height, width, CV_32FC1, h_src);
-			input_channels.push_back(channel);
-			h_src += height * width;
-		}
-		return std::move(input_channels);
-	}
-};
-
-class Logger : public nvinfer1::ILogger
-{
-public:
-	void log(nvinfer1::ILogger::Severity severity, const char* msg)
-	{
-		switch (severity)
-		{
-		case nvinfer1::ILogger::Severity::kINTERNAL_ERROR:
-			std::cerr << "kINTERNAL_ERROR: " << msg << std::endl;
-			break;
-		case nvinfer1::ILogger::Severity::kERROR:
-			std::cerr << "kERROR: " << msg << std::endl;
-			break;
-		case nvinfer1::ILogger::Severity::kWARNING:
-			std::cerr << "kWARNING: " << msg << std::endl;
-			break;
-		case nvinfer1::ILogger::Severity::kINFO:
-			std::cerr << "kINFO: " << msg << std::endl;
-			break;
-		case nvinfer1::ILogger::Severity::kVERBOSE:
-			std::cerr << "kVERBOSE: " << msg << std::endl;
-			break;
-		default:
-			break;
-		}
-	}
+	Shape max_shape{ 1, 3, 640, 640 };
 };
 
 class BiSeNet
@@ -125,7 +38,37 @@ public:
 	cv::Mat Extract(const cv::Mat& img);
 
 private:
-	void mallocInputOutput(const Shape &input_shape, const Shape &output_shape);
+	class Logger : public nvinfer1::ILogger
+	{
+	public:
+		void log(nvinfer1::ILogger::Severity severity, const char* msg)
+		{
+			switch (severity)
+			{
+			case nvinfer1::ILogger::Severity::kINTERNAL_ERROR:
+				std::cerr << "kINTERNAL_ERROR: " << msg << std::endl;
+				break;
+			case nvinfer1::ILogger::Severity::kERROR:
+				std::cerr << "kERROR: " << msg << std::endl;
+				break;
+			case nvinfer1::ILogger::Severity::kWARNING:
+				std::cerr << "kWARNING: " << msg << std::endl;
+				break;
+			case nvinfer1::ILogger::Severity::kINFO:
+				std::cerr << "kINFO: " << msg << std::endl;
+				break;
+			case nvinfer1::ILogger::Severity::kVERBOSE:
+				std::cerr << "kVERBOSE: " << msg << std::endl;
+				break;
+			default:
+				break;
+			}
+		}
+	};
+
+private:
+	// void mallocInputOutput(const Shape &input_shape, const Shape &output_shape); 
+	void mallocInputOutput();
 	void SaveRTModel(nvinfer1::IHostMemory* gie_model_stream, const std::string& path);
 
 	void deserializeCudaEngine(const void* blob_data, std::size_t size);
@@ -140,6 +83,11 @@ private:
 	static void softmax(vector<float>& vec);
 	static int findMaxIdx(const vector<float>& vec);
 
+	bool CheckFileExist(const std::string& path)
+	{
+		std::ifstream check_file(path);
+		return check_file.is_open();
+	}
 
 private:
 	OnnxInitParam _params;
@@ -154,9 +102,10 @@ private:
 
 	float* h_input_tensor_;
 	float* d_input_tensor_;
-	Shape input_shape_t;
+	Shape input_shape_t; // 记录每次前向预测的输入样本的shape
+	float* h_output_tensor_;
 	float* d_output_tensor_;
-	Shape output_shape_t;
+	Shape output_shape_t; // 记录每次前向预测的输出样本的shape
 
 	std::vector<float> mean_{ 0.485, 0.456, 0.406 };
 	std::vector<float> std_{ 0.229, 0.224, 0.225 };
