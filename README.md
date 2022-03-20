@@ -32,6 +32,8 @@
   params.gpu_id = 0;
 # 模型分割的类别数
   params.num_classes = 4;
+# 设置最大网络输入大小，用于分配内存(显存), 这里需要根据自己的需求设置
+  params.max_shape = Shape(1, 3, 640, 640);
 
 # 实例化BiSeNet类，其中会进行模型转化和一些初始化的操作
   BiSeNet model(params);
