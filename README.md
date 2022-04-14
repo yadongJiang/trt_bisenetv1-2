@@ -15,11 +15,11 @@
 3. gpu_func.cuh与gpu_func.cu为后处理gpu代码。我实现了cpu版与gpu版后处理，这里是gpu版后处理的实现
 
 ## 主要接口
-PreProcessCpu 数据预处理cpu代码，在cpu上预处理数据
-ProProcessGPU 数据预处理cuda代码，在gpu设备上预处理数据
-PostProcessCpu 算法后处理cpu代码
-PostProcessGpu 算法后处理cuda代码
-Extract 算法执行接口，对外接口
+1. PreProcessCpu 数据预处理cpu代码，在cpu上预处理数据
+2. ProProcessGPU 数据预处理cuda代码，在gpu设备上预处理数据
+3. PostProcessCpu 算法后处理cpu代码
+4. PostProcessGpu 算法后处理cuda代码
+5. Extract 算法执行接口，对外接口
 
 ## 使用方法
 
