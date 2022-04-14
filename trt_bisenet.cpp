@@ -11,6 +11,7 @@ cv::Mat BiSeNet::Extract(const cv::Mat& img)
 	if (img.empty())
 		return img;
 
+	std::lock_guard<std::mutex> lock(mtx_);
 	/*PreProcessCpu(img);*/
 	ProProcessGPU(img);
 	Forward();

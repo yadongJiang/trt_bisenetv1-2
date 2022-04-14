@@ -2,6 +2,7 @@
 #define TRT_BISENET_H_
 
 #include "trt_onnx_base.h"
+#include <mutex>
 
 #define MIN(x, y) (x) < (y) ? (x) : (y)
 
@@ -38,6 +39,8 @@ private:
 
 	std::vector<float> mean_{ 0.485, 0.456, 0.406 };
 	std::vector<float> std_{ 0.229, 0.224, 0.225 };
+
+	std::mutex mtx_;
 };
 
 #endif
